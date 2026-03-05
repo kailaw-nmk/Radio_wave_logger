@@ -28,7 +28,10 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -40,7 +43,15 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "バックグラウンドでの計測中も位置情報を記録するために使用します。",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

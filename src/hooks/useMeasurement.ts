@@ -7,7 +7,7 @@ import type {
   MeasurementStatus,
   TestDataSize,
 } from '../types';
-import { getCurrentLocation } from '../services/LocationService';
+import { getCurrentLocation, LocationError } from '../services/LocationService';
 import { getNetworkInfo } from '../services/NetworkInfoService';
 import {
   defaultSpeedTestProvider,
@@ -116,11 +116,20 @@ export function useMeasurement(): UseMeasurementReturn {
     if (!filePathRef.current) return;
 
     try {
-      // GPS・ネットワーク情報を並行取得 (帯域を使わない)
-      const [location, networkInfo] = await Promise.all([
-        getCurrentLocation(),
-        getNetworkInfo(),
-      ]);
+      // GPS取得 (権限エラーは個別ハンドリング)
+      let location: { latitude: number; longitude: number; accuracy: number } | null = null;
+      try {
+        location = await getCurrentLocation();
+      } catch (e) {
+        if (e instanceof LocationError && e.code === 'PERMISSION_DENIED') {
+          // 権限拒否: エラー表示するがポーリングは継続
+          dispatch({ type: 'ERROR', message: e.message });
+        }
+        // GPS取得失敗でも速度測定は続行 (locationはnullのまま)
+      }
+
+      // ネットワーク情報取得
+      const networkInfo = await getNetworkInfo();
 
       // 速度テストは順次実行 (Ping → Download → Upload)
       const speedResult = await measureAll(defaultSpeedTestProvider);
@@ -144,7 +153,9 @@ export function useMeasurement(): UseMeasurementReturn {
       countRef.current += 1;
       dispatch({ type: 'RECORD', record, count: countRef.current });
     } catch {
-      dispatch({ type: 'ERROR', message: '計測中にエラーが発生しました' });
+      // 速度測定やファイル書き込みの致命的エラー
+      // ポーリングは継続し、次回の計測で回復を試みる
+      dispatch({ type: 'ERROR', message: '計測中にエラーが発生しました。次回の計測で再試行します。' });
     }
   }, []);
 
@@ -182,7 +193,7 @@ export function useMeasurement(): UseMeasurementReturn {
       } catch {
         dispatch({
           type: 'ERROR',
-          message: '計測の開始に失敗しました',
+          message: '計測の開始に失敗しました。ストレージの空き容量を確認してください。',
         });
       }
     },
