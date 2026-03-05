@@ -1,4 +1,8 @@
-import { getCurrentLocation, requestLocationPermission } from '../src/services/LocationService';
+import {
+  getCurrentLocation,
+  requestLocationPermission,
+  LocationError,
+} from '../src/services/LocationService';
 import { __setPermissionStatus, __setMockLocation } from '../__mocks__/expo-location';
 
 describe('LocationService', () => {
@@ -30,10 +34,21 @@ describe('LocationService', () => {
       expect(result!.accuracy).toBe(10);
     });
 
-    it('パーミッション拒否時、nullを返す', async () => {
+    it('パーミッション拒否時、LocationErrorをthrowする', async () => {
       __setPermissionStatus('denied');
-      const result = await getCurrentLocation();
-      expect(result).toBeNull();
+      await expect(getCurrentLocation()).rejects.toThrow(LocationError);
+      await expect(getCurrentLocation()).rejects.toThrow('位置情報の権限が許可されていません');
+    });
+
+    it('LocationErrorのcodeがPERMISSION_DENIEDである', async () => {
+      __setPermissionStatus('denied');
+      try {
+        await getCurrentLocation();
+        fail('エラーがthrowされるべき');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LocationError);
+        expect((e as LocationError).code).toBe('PERMISSION_DENIED');
+      }
     });
   });
 });

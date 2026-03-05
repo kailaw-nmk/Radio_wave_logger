@@ -11,5 +11,6 @@ module.exports = {
     '^@react-native-community/netinfo$': '<rootDir>/__mocks__/@react-native-community/netinfo.ts',
     '^@react-native-async-storage/async-storage$': '<rootDir>/__mocks__/@react-native-async-storage/async-storage.ts',
     '^react-native$': '<rootDir>/__mocks__/react-native.ts',
+    '^expo-task-manager$': '<rootDir>/__mocks__/expo-task-manager.ts',
   },
 };
