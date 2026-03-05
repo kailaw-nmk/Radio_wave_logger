@@ -23,6 +23,14 @@ export function formatCoordinate(value: number | null): string {
   return value.toFixed(6);
 }
 
+/** ポーリング間隔(秒)を表示用文字列に変換 */
+export function formatInterval(seconds: number): string {
+  if (seconds < 60) return `${seconds}秒`;
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return sec > 0 ? `${min}分${sec}秒` : `${min}分`;
+}
+
 /** セッションID用の日時文字列を生成 (YYYYMMDD_HHmmss) */
 export function generateSessionId(): string {
   const now = new Date();

@@ -2,17 +2,17 @@ import type { AppSettings, TestDataSize } from '../types';
 
 /** アプリのデフォルト設定 */
 export const DEFAULT_SETTINGS: AppSettings = {
-  pollingIntervalMinutes: 5,
+  pollingIntervalSeconds: 300,
   emailAddress: '',
   testDataSize: 'light',
   memoTemplate: '',
 };
 
-/** ポーリング間隔の範囲 (分) */
+/** ポーリング間隔の範囲 (秒) */
 export const POLLING_INTERVAL = {
-  MIN: 1,
-  MAX: 60,
-  DEFAULT: 5,
+  MIN: 10,
+  MAX: 3600,
+  DEFAULT: 300,
 } as const;
 
 /** Cloudflare Speed Test エンドポイント */

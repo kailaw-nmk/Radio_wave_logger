@@ -43,7 +43,7 @@ export async function requestBackgroundPermission(): Promise<boolean> {
 
 /** バックグラウンド位置情報の追跡を開始する */
 export async function startBackgroundTracking(
-  intervalMinutes: number,
+  intervalSeconds: number,
 ): Promise<boolean> {
   const hasPermission = await requestBackgroundPermission();
   if (!hasPermission) return false;
@@ -56,7 +56,7 @@ export async function startBackgroundTracking(
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
     accuracy: Location.Accuracy.High,
-    timeInterval: intervalMinutes * 60 * 1000,
+    timeInterval: intervalSeconds * 1000,
     distanceInterval: 0,
     // Android: フォアグラウンドサービス通知
     foregroundService: {

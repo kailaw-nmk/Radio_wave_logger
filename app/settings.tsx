@@ -8,14 +8,29 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSettings } from '../src/hooks/useSettings';
 import { POLLING_INTERVAL } from '../src/constants';
 import type { TestDataSize } from '../src/types';
+import { isMailAvailable, sendTestEmail } from '../src/services/MailService';
 
 /** 設定画面 */
 export default function SettingsScreen() {
   const { settings, updateSettings, isLoading } = useSettings();
+
+  async function handleSendTestEmail() {
+    const available = await isMailAvailable();
+    if (!available) {
+      Alert.alert('エラー', 'この端末ではメール送信ができません');
+      return;
+    }
+    try {
+      await sendTestEmail(settings.emailAddress);
+    } catch {
+      Alert.alert('エラー', 'テストメールの送信に失敗しました');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -33,8 +48,8 @@ export default function SettingsScreen() {
     >
       {/* ポーリング間隔 */}
       <IntervalSection
-        value={settings.pollingIntervalMinutes}
-        onChange={(v) => updateSettings({ pollingIntervalMinutes: v })}
+        value={settings.pollingIntervalSeconds}
+        onChange={(v) => updateSettings({ pollingIntervalSeconds: v })}
       />
 
       {/* テストデータサイズ */}
@@ -70,6 +85,23 @@ export default function SettingsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
+        <Pressable
+          style={[
+            styles.testMailButton,
+            !settings.emailAddress && styles.testMailButtonDisabled,
+          ]}
+          onPress={handleSendTestEmail}
+          disabled={!settings.emailAddress}
+        >
+          <Text
+            style={[
+              styles.testMailButtonText,
+              !settings.emailAddress && styles.testMailButtonTextDisabled,
+            ]}
+          >
+            テスト送信
+          </Text>
+        </Pressable>
       </View>
 
       {/* メモテンプレート */}
@@ -126,12 +158,12 @@ function IntervalSection({
           onChangeText={setInputText}
           onEndEditing={handleEndEditing}
           keyboardType="number-pad"
-          maxLength={2}
+          maxLength={4}
         />
-        <Text style={styles.intervalUnit}>分</Text>
+        <Text style={styles.intervalUnit}>秒</Text>
       </View>
       <Text style={styles.hint}>
-        {POLLING_INTERVAL.MIN}〜{POLLING_INTERVAL.MAX}分の範囲で設定できます
+        {POLLING_INTERVAL.MIN}〜{POLLING_INTERVAL.MAX}秒の範囲で設定できます
       </Text>
     </View>
   );
@@ -208,7 +240,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333333',
     textAlign: 'center',
-    width: 80,
+    width: 100,
   },
   intervalUnit: {
     fontSize: 18,
@@ -248,5 +280,24 @@ const styles = StyleSheet.create({
   multilineInput: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  testMailButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  testMailButtonDisabled: {
+    borderColor: '#cccccc',
+  },
+  testMailButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2196F3',
+  },
+  testMailButtonTextDisabled: {
+    color: '#cccccc',
   },
 });
