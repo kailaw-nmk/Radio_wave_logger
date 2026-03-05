@@ -27,6 +27,17 @@ export async function isMailAvailable(): Promise<boolean> {
   return MailComposer.isAvailableAsync();
 }
 
+/** テストメールを送信する */
+export async function sendTestEmail(
+  toAddress: string,
+): Promise<MailComposer.MailComposerResult> {
+  return MailComposer.composeAsync({
+    recipients: [toAddress],
+    subject: 'Radio Wave Logger テストメール',
+    body: 'メール送信のテストです。このメールが届いていれば、ログファイルの送信設定は正常です。',
+  });
+}
+
 /** ログファイルをメールで送信する */
 export async function sendLogByEmail(
   options: SendLogOptions,

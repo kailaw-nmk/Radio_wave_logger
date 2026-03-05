@@ -39,8 +39,6 @@ __pycache__/
 *.pyc
 .venv/
 
-# 可視化出力
-tools/*.html
 
 # Playwright MCP
 .playwright-mcp/

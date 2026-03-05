@@ -28,8 +28,14 @@ export function useSettings(): UseSettingsReturn {
     try {
       const json = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (json) {
-        const saved = JSON.parse(json) as Partial<AppSettings>;
-        setSettings({ ...DEFAULT_SETTINGS, ...saved });
+        const saved = JSON.parse(json) as Record<string, unknown>;
+        // 旧フォーマット移行: pollingIntervalMinutes → pollingIntervalSeconds
+        if ('pollingIntervalMinutes' in saved && !('pollingIntervalSeconds' in saved)) {
+          saved.pollingIntervalSeconds = (saved.pollingIntervalMinutes as number) * 60;
+          delete saved.pollingIntervalMinutes;
+          await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(saved));
+        }
+        setSettings({ ...DEFAULT_SETTINGS, ...(saved as Partial<AppSettings>) });
       }
     } catch {
       // 読み込み失敗時はデフォルト値を使用

@@ -38,8 +38,8 @@ export type CellularGeneration = '2g' | '3g' | '4g' | '5g' | 'unknown';
 
 /** アプリ設定 */
 export interface AppSettings {
-  /** ポーリング間隔 (分) */
-  pollingIntervalMinutes: number;
+  /** ポーリング間隔 (秒) */
+  pollingIntervalSeconds: number;
   /** 送信先メールアドレス */
   emailAddress: string;
   /** テストデータサイズ */

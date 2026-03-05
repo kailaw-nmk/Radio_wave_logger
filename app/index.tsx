@@ -5,6 +5,7 @@ import {
   formatSpeed,
   formatPing,
   formatCoordinate,
+  formatInterval,
 } from '../src/utils/format';
 
 /** メイン画面（計測画面） */
@@ -20,7 +21,7 @@ export default function MeasurementScreen() {
       stopMeasuring();
     } else {
       startMeasuring({
-        intervalMinutes: settings.pollingIntervalMinutes,
+        intervalSeconds: settings.pollingIntervalSeconds,
         memo: settings.memoTemplate,
         testDataSize: settings.testDataSize,
       });
@@ -66,7 +67,7 @@ export default function MeasurementScreen() {
           <InfoRow label="計測回数" value={`${session.measurementCount} 回`} />
           <InfoRow
             label="間隔"
-            value={`${settings.pollingIntervalMinutes} 分`}
+            value={formatInterval(settings.pollingIntervalSeconds)}
           />
           <InfoRow
             label="テストサイズ"

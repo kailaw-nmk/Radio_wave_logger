@@ -83,7 +83,7 @@ function reducer(
 
 /** 計測開始時のオプション */
 interface StartOptions {
-  intervalMinutes: number;
+  intervalSeconds: number;
   memo?: string;
   testDataSize?: TestDataSize;
 }
@@ -188,7 +188,7 @@ export function useMeasurement(): UseMeasurementReturn {
         await performMeasurement();
 
         // ポーリング開始
-        const intervalMs = options.intervalMinutes * 60 * 1000;
+        const intervalMs = options.intervalSeconds * 1000;
         intervalRef.current = setInterval(performMeasurement, intervalMs);
       } catch {
         dispatch({
