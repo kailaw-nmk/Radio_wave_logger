@@ -1,6 +1,10 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import { defineBackgroundTask } from '../src/services/BackgroundService';
+
+// アプリ起動時にバックグラウンドタスクを定義（トップレベルで1回のみ）
+defineBackgroundTask();
 
 export default function RootLayout() {
   return (
