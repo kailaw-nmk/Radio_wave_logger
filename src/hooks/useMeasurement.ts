@@ -1,6 +1,6 @@
 /** 計測制御フック */
 
-import { useReducer, useRef, useCallback } from 'react';
+import { useReducer, useRef, useCallback, useEffect } from 'react';
 import type {
   MeasurementRecord,
   MeasurementSession,
@@ -15,6 +15,11 @@ import {
 } from '../services/SpeedTestService';
 import { createLogFile, appendRecord } from '../services/LoggingService';
 import { formatTimestamp, generateSessionId } from '../utils/format';
+import {
+  setLocationCallback,
+  startBackgroundTracking,
+  stopBackgroundTracking,
+} from '../services/BackgroundService';
 
 // --- State ---
 
@@ -110,6 +115,16 @@ export function useMeasurement(): UseMeasurementReturn {
   const filePathRef = useRef<string | null>(null);
   const countRef = useRef(0);
   const memoRef = useRef('');
+  const isMeasuringRef = useRef(false);
+
+  // アンマウント時にバックグラウンドトラッキングをクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (isMeasuringRef.current) {
+        stopBackgroundTracking();
+      }
+    };
+  }, []);
 
   /** 1回の計測を実行する */
   const performMeasurement = useCallback(async (): Promise<void> => {
@@ -187,7 +202,24 @@ export function useMeasurement(): UseMeasurementReturn {
         // 最初の計測を即座に実行
         await performMeasurement();
 
-        // ポーリング開始
+        // バックグラウンド位置情報トラッキングを開始
+        // 位置情報更新をトリガーとして計測を実行する
+        setLocationCallback(() => {
+          performMeasurement();
+        });
+
+        const bgStarted = await startBackgroundTracking(options.intervalSeconds);
+        isMeasuringRef.current = true;
+
+        if (!bgStarted) {
+          // バックグラウンド権限が取得できなかった場合はsetIntervalのみで動作
+          dispatch({
+            type: 'ERROR',
+            message: 'バックグラウンド権限が未許可のため、アプリがバックグラウンド時に計測が停止する可能性があります。',
+          });
+        }
+
+        // フォアグラウンド時の補助タイマー
         const intervalMs = options.intervalSeconds * 1000;
         intervalRef.current = setInterval(performMeasurement, intervalMs);
       } catch {
@@ -206,6 +238,9 @@ export function useMeasurement(): UseMeasurementReturn {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    // バックグラウンドトラッキングを停止
+    stopBackgroundTracking();
+    isMeasuringRef.current = false;
     filePathRef.current = null;
     dispatch({ type: 'STOP' });
   }, []);

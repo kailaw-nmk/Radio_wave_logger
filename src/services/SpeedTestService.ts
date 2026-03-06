@@ -86,8 +86,10 @@ export class CloudflareSpeedTestProvider implements ISpeedTestProvider {
       const blob = await response.blob();
       const end = performance.now();
 
-      const actualBytes = blob.size || bytes;
-      return bytesToMbps(actualBytes, end - start);
+      // レート制限等で空レスポンスが返った場合はnullを返す
+      if (blob.size === 0) return null;
+
+      return bytesToMbps(blob.size, end - start);
     } catch {
       return null;
     }

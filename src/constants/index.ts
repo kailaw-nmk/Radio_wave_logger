@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 /** ポーリング間隔の範囲 (秒) */
 export const POLLING_INTERVAL = {
-  MIN: 10,
+  MIN: 60,
   MAX: 3600,
   DEFAULT: 300,
 } as const;

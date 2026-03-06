@@ -1,7 +1,8 @@
 /** 設定管理フック */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 import type { AppSettings } from '../types';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../constants';
 
@@ -19,10 +20,12 @@ export function useSettings(): UseSettingsReturn {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 起動時に設定を読み込む
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  // 画面フォーカス時に設定を再読み込みする
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, []),
+  );
 
   async function loadSettings(): Promise<void> {
     try {

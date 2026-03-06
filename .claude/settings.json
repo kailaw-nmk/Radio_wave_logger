@@ -5,22 +5,22 @@
   },
   "permissions": {
     "allow": [
-      "Bash(npx expo install *)",
-      "Bash(npx expo start *)",
-      "Bash(npx expo doctor *)",
-      "Bash(npx create-expo-app *)",
-      "Bash(npm run *)",
-      "Bash(npm test *)",
+      "Bash(npx expo *)",
+      "Bash(npm *)",
       "Bash(npx jest *)",
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
       "Bash(node *)",
       "Bash(python *)",
       "Bash(pip install *)",
+      "Bash(git *)",
       "Bash(cat *)",
       "Bash(mkdir *)",
       "Bash(dir *)",
-      "Bash(git *)"
+      "Bash(echo *)",
+      "Bash(curl *)",
+      "Bash(rm *)",
+      "Bash(gh repo *)"
     ],
     "deny": [
       "Read(.env)",
