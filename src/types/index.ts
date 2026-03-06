@@ -46,6 +46,8 @@ export interface AppSettings {
   testDataSize: TestDataSize;
   /** メモテンプレート */
   memoTemplate: string;
+  /** 画面を点灯したままにする */
+  keepScreenAwake: boolean;
 }
 
 /** テストデータサイズ */

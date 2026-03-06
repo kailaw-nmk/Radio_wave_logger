@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import { useSettings } from '../src/hooks/useSettings';
 import { POLLING_INTERVAL } from '../src/constants';
@@ -119,6 +120,24 @@ export default function SettingsScreen() {
         <Text style={styles.hint}>
           各計測レコードのmemoカラムに記録されます
         </Text>
+      </View>
+
+      {/* 画面点灯維持 */}
+      <View style={styles.section}>
+        <View style={styles.switchRow}>
+          <View style={styles.switchLabelContainer}>
+            <Text style={styles.sectionTitle}>画面を点灯したままにする</Text>
+            <Text style={styles.hint}>
+              計測中に画面が消灯しなくなります。充電中の使用を推奨します
+            </Text>
+          </View>
+          <Switch
+            value={settings.keepScreenAwake}
+            onValueChange={(v) => updateSettings({ keepScreenAwake: v })}
+            trackColor={{ false: '#cccccc', true: '#90CAF9' }}
+            thumbColor={settings.keepScreenAwake ? '#2196F3' : '#f4f3f4'}
+          />
+        </View>
       </View>
     </ScrollView>
   );
@@ -299,5 +318,14 @@ const styles = StyleSheet.create({
   },
   testMailButtonTextDisabled: {
     color: '#cccccc',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 12,
   },
 });

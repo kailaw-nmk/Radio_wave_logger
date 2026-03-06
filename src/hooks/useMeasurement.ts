@@ -1,6 +1,7 @@
 /** 計測制御フック */
 
 import { useReducer, useRef, useCallback, useEffect } from 'react';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 import type {
   MeasurementRecord,
   MeasurementSession,
@@ -19,7 +20,18 @@ import {
   setLocationCallback,
   startBackgroundTracking,
   stopBackgroundTracking,
+  isBackgroundTrackingActive,
 } from '../services/BackgroundService';
+import {
+  saveMeasurementState,
+  loadMeasurementState,
+  clearMeasurementState,
+  updateMeasurementCount,
+} from '../services/MeasurementStateStore';
+import {
+  activateKeepAwakeAsync,
+  deactivateKeepAwake,
+} from 'expo-keep-awake';
 
 // --- State ---
 
@@ -41,6 +53,7 @@ const initialState: MeasurementState = {
 
 type MeasurementAction =
   | { type: 'START'; session: MeasurementSession }
+  | { type: 'RESTORE'; session: MeasurementSession }
   | { type: 'RECORD'; record: MeasurementRecord; count: number }
   | { type: 'STOP' }
   | { type: 'ERROR'; message: string }
@@ -58,6 +71,13 @@ function reducer(
         status: 'measuring',
         error: null,
         lastRecord: null,
+      };
+    case 'RESTORE':
+      return {
+        ...state,
+        session: action.session,
+        status: 'measuring',
+        error: null,
       };
     case 'RECORD':
       return {
@@ -91,6 +111,7 @@ interface StartOptions {
   intervalSeconds: number;
   memo?: string;
   testDataSize?: TestDataSize;
+  keepScreenAwake?: boolean;
 }
 
 interface UseMeasurementReturn {
@@ -116,37 +137,42 @@ export function useMeasurement(): UseMeasurementReturn {
   const countRef = useRef(0);
   const memoRef = useRef('');
   const isMeasuringRef = useRef(false);
-
-  // アンマウント時にバックグラウンドトラッキングをクリーンアップ
-  useEffect(() => {
-    return () => {
-      if (isMeasuringRef.current) {
-        stopBackgroundTracking();
-      }
-    };
-  }, []);
+  const intervalSecondsRef = useRef(0);
+  const measurementInProgressRef = useRef(false);
+  const lastMeasurementTimeRef = useRef(0);
+  const keepScreenAwakeRef = useRef(false);
 
   /** 1回の計測を実行する */
-  const performMeasurement = useCallback(async (): Promise<void> => {
+  const performMeasurement = useCallback(async (preLocation?: {
+    latitude: number; longitude: number; accuracy: number;
+  }): Promise<void> => {
     if (!filePathRef.current) return;
 
+    // 重複計測ガード
+    if (measurementInProgressRef.current) return;
+    const now = Date.now();
+    const minGap = (intervalSecondsRef.current * 1000) / 2;
+    if (now - lastMeasurementTimeRef.current < minGap) return;
+    measurementInProgressRef.current = true;
+
     try {
-      // GPS取得 (権限エラーは個別ハンドリング)
-      let location: { latitude: number; longitude: number; accuracy: number } | null = null;
-      try {
-        location = await getCurrentLocation();
-      } catch (e) {
-        if (e instanceof LocationError && e.code === 'PERMISSION_DENIED') {
-          // 権限拒否: エラー表示するがポーリングは継続
-          dispatch({ type: 'ERROR', message: e.message });
+      // GPS取得 (バックグラウンドから位置情報が渡された場合はそれを使用)
+      let location: { latitude: number; longitude: number; accuracy: number } | null =
+        preLocation ?? null;
+      if (!location) {
+        try {
+          location = await getCurrentLocation();
+        } catch (e) {
+          if (e instanceof LocationError && e.code === 'PERMISSION_DENIED') {
+            dispatch({ type: 'ERROR', message: e.message });
+          }
         }
-        // GPS取得失敗でも速度測定は続行 (locationはnullのまま)
       }
 
       // ネットワーク情報取得
       const networkInfo = await getNetworkInfo();
 
-      // 速度テストは順次実行 (Ping → Download → Upload)
+      // 速度テスト
       const speedResult = await measureAll(defaultSpeedTestProvider);
 
       const record: MeasurementRecord = {
@@ -167,27 +193,151 @@ export function useMeasurement(): UseMeasurementReturn {
       appendRecord(filePathRef.current, record);
       countRef.current += 1;
       dispatch({ type: 'RECORD', record, count: countRef.current });
+
+      // 永続化された計測回数を更新
+      updateMeasurementCount(countRef.current);
     } catch {
-      // 速度測定やファイル書き込みの致命的エラー
-      // ポーリングは継続し、次回の計測で回復を試みる
       dispatch({ type: 'ERROR', message: '計測中にエラーが発生しました。次回の計測で再試行します。' });
+    } finally {
+      measurementInProgressRef.current = false;
+      lastMeasurementTimeRef.current = Date.now();
     }
   }, []);
+
+  /** フォアグラウンドタイマーを開始する */
+  const startForegroundTimer = useCallback(
+    (intervalSeconds: number) => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      const intervalMs = intervalSeconds * 1000;
+      intervalRef.current = setInterval(performMeasurement, intervalMs);
+    },
+    [performMeasurement],
+  );
+
+  /** フォアグラウンドタイマーを停止する */
+  const stopForegroundTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  /** バックグラウンド復帰時にセッションを復元する */
+  const restoreSession = useCallback(async (): Promise<void> => {
+    // 既にフック側で計測中なら何もしない
+    if (isMeasuringRef.current) return;
+
+    const persisted = await loadMeasurementState();
+    if (!persisted) return;
+
+    // バックグラウンドタスクがまだ動いているか確認
+    const bgActive = await isBackgroundTrackingActive();
+    if (!bgActive) {
+      // バックグラウンドタスクが停止していたら永続状態もクリア
+      await clearMeasurementState();
+      return;
+    }
+
+    // 計測状態を復元
+    filePathRef.current = persisted.filePath;
+    countRef.current = persisted.measurementCount;
+    memoRef.current = persisted.memo;
+    intervalSecondsRef.current = persisted.intervalSeconds;
+    isMeasuringRef.current = true;
+
+    // テストデータサイズを復元
+    defaultSpeedTestProvider.setTestDataSize(persisted.testDataSize);
+
+    // keepScreenAwakeを復元
+    keepScreenAwakeRef.current = persisted.keepScreenAwake ?? false;
+    if (keepScreenAwakeRef.current) {
+      activateKeepAwakeAsync('measurement');
+    }
+
+    const session: MeasurementSession = {
+      sessionId: persisted.sessionId,
+      startedAt: persisted.startedAt,
+      endedAt: null,
+      measurementCount: persisted.measurementCount,
+      status: 'measuring',
+    };
+    dispatch({ type: 'RESTORE', session });
+
+    // バックグラウンドタスクのコールバックを再登録 (位置情報を直接渡す)
+    setLocationCallback((locations) => {
+      const loc = locations[locations.length - 1];
+      performMeasurement({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        accuracy: loc.coords.accuracy ?? 0,
+      });
+    });
+
+    // フォアグラウンドタイマーを再開
+    startForegroundTimer(persisted.intervalSeconds);
+  }, [performMeasurement, startForegroundTimer]);
+
+  // マウント時にセッション復元を試みる
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
+  // AppState監視: フォアグラウンド復帰時にタイマー再開・セッション復元
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        if (isMeasuringRef.current) {
+          // 計測中ならフォアグラウンドタイマーを再開
+          startForegroundTimer(intervalSecondsRef.current);
+        } else {
+          // 計測中でなければ復元を試みる (OSにコンポーネントが破棄された場合)
+          restoreSession();
+        }
+      } else if (nextState === 'background') {
+        // iOS: JSスレッドが停止するためタイマーを停止
+        // Android: フォアグラウンドサービスがプロセスを維持するためタイマーを継続
+        if (Platform.OS === 'ios') {
+          stopForegroundTimer();
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [restoreSession, startForegroundTimer, stopForegroundTimer]);
+
+  // アンマウント時はフォアグラウンドタイマーのみ停止
+  // バックグラウンドトラッキングは停止しない (明示的な停止ボタンでのみ停止)
+  useEffect(() => {
+    return () => {
+      stopForegroundTimer();
+    };
+  }, [stopForegroundTimer]);
 
   /** 計測を開始する */
   const startMeasuring = useCallback(
     async (options: StartOptions): Promise<void> => {
       try {
-        // テストデータサイズをプロバイダーに反映
-        defaultSpeedTestProvider.setTestDataSize(
-          options.testDataSize ?? 'light',
-        );
+        const testDataSize = options.testDataSize ?? 'light';
+        const keepAwake = options.keepScreenAwake ?? false;
+        defaultSpeedTestProvider.setTestDataSize(testDataSize);
+        keepScreenAwakeRef.current = keepAwake;
+
+        // 画面点灯維持
+        if (keepAwake) {
+          await activateKeepAwakeAsync('measurement');
+        }
 
         const sessionId = generateSessionId();
         const filePath = createLogFile(sessionId);
         filePathRef.current = filePath;
         countRef.current = 0;
         memoRef.current = options.memo ?? '';
+        intervalSecondsRef.current = options.intervalSeconds;
 
         const session: MeasurementSession = {
           sessionId,
@@ -199,29 +349,43 @@ export function useMeasurement(): UseMeasurementReturn {
 
         dispatch({ type: 'START', session });
 
+        // 永続化
+        await saveMeasurementState({
+          sessionId,
+          filePath,
+          startedAt: session.startedAt,
+          measurementCount: 0,
+          memo: memoRef.current,
+          intervalSeconds: options.intervalSeconds,
+          testDataSize,
+          keepScreenAwake: keepAwake,
+        });
+
         // 最初の計測を即座に実行
         await performMeasurement();
 
-        // バックグラウンド位置情報トラッキングを開始
-        // 位置情報更新をトリガーとして計測を実行する
-        setLocationCallback(() => {
-          performMeasurement();
+        // バックグラウンド位置情報トラッキングを開始 (位置情報を直接渡す)
+        setLocationCallback((locations) => {
+          const loc = locations[locations.length - 1];
+          performMeasurement({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            accuracy: loc.coords.accuracy ?? 0,
+          });
         });
 
         const bgStarted = await startBackgroundTracking(options.intervalSeconds);
         isMeasuringRef.current = true;
 
         if (!bgStarted) {
-          // バックグラウンド権限が取得できなかった場合はsetIntervalのみで動作
           dispatch({
             type: 'ERROR',
             message: 'バックグラウンド権限が未許可のため、アプリがバックグラウンド時に計測が停止する可能性があります。',
           });
         }
 
-        // フォアグラウンド時の補助タイマー
-        const intervalMs = options.intervalSeconds * 1000;
-        intervalRef.current = setInterval(performMeasurement, intervalMs);
+        // フォアグラウンド補助タイマー
+        startForegroundTimer(options.intervalSeconds);
       } catch {
         dispatch({
           type: 'ERROR',
@@ -229,21 +393,25 @@ export function useMeasurement(): UseMeasurementReturn {
         });
       }
     },
-    [performMeasurement],
+    [performMeasurement, startForegroundTimer],
   );
 
   /** 計測を停止する */
   const stopMeasuring = useCallback((): void => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    stopForegroundTimer();
     // バックグラウンドトラッキングを停止
     stopBackgroundTracking();
     isMeasuringRef.current = false;
     filePathRef.current = null;
+    // 画面点灯維持を解除
+    if (keepScreenAwakeRef.current) {
+      deactivateKeepAwake('measurement');
+      keepScreenAwakeRef.current = false;
+    }
+    // 永続化をクリア
+    clearMeasurementState();
     dispatch({ type: 'STOP' });
-  }, []);
+  }, [stopForegroundTimer]);
 
   return {
     session: state.session,
