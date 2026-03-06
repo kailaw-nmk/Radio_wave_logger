@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emailAddress: '',
   testDataSize: 'light',
   memoTemplate: '',
+  keepScreenAwake: false,
 };
 
 /** ポーリング間隔の範囲 (秒) */

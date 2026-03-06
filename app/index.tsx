@@ -24,6 +24,7 @@ export default function MeasurementScreen() {
         intervalSeconds: settings.pollingIntervalSeconds,
         memo: settings.memoTemplate,
         testDataSize: settings.testDataSize,
+        keepScreenAwake: settings.keepScreenAwake,
       });
     }
   }
