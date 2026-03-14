@@ -18,6 +18,7 @@ function createTestRecord(overrides?: Partial<MeasurementRecord>): MeasurementRe
     carrier: 'docomo',
     signal_dbm: -75,
     memo: 'テスト計測',
+    session_id: 'netlog_20250115_103000',
     ...overrides,
   };
 }
@@ -36,7 +37,7 @@ describe('csv.ts', () => {
       const columns = [
         'timestamp', 'latitude', 'longitude', 'accuracy',
         'download_mbps', 'upload_mbps', 'ping_ms',
-        'connection_type', 'cellular_gen', 'carrier', 'signal_dbm', 'memo',
+        'connection_type', 'cellular_gen', 'carrier', 'signal_dbm', 'memo', 'session_id',
       ];
       for (const col of columns) {
         expect(header).toContain(col);
@@ -49,7 +50,7 @@ describe('csv.ts', () => {
       const record = createTestRecord();
       const line = recordToCsvLine(record);
       expect(line).toBe(
-        '2025-01-15T10:30:00.000Z,35.6762,139.6503,10.5,50.3,20.1,15,cellular,4g,docomo,-75,テスト計測',
+        '2025-01-15T10:30:00.000Z,35.6762,139.6503,10.5,50.3,20.1,15,cellular,4g,docomo,-75,テスト計測,netlog_20250115_103000',
       );
     });
 

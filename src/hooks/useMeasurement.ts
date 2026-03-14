@@ -141,6 +141,7 @@ export function useMeasurement(): UseMeasurementReturn {
   const measurementInProgressRef = useRef(false);
   const lastMeasurementTimeRef = useRef(0);
   const keepScreenAwakeRef = useRef(false);
+  const sessionIdRef = useRef('');
 
   /** 1回の計測を実行する */
   const performMeasurement = useCallback(async (preLocation?: {
@@ -188,6 +189,7 @@ export function useMeasurement(): UseMeasurementReturn {
         carrier: networkInfo.carrier,
         signal_dbm: networkInfo.signal_dbm,
         memo: memoRef.current,
+        session_id: sessionIdRef.current,
       };
 
       appendRecord(filePathRef.current, record);
@@ -242,6 +244,7 @@ export function useMeasurement(): UseMeasurementReturn {
 
     // 計測状態を復元
     filePathRef.current = persisted.filePath;
+    sessionIdRef.current = persisted.sessionId;
     countRef.current = persisted.measurementCount;
     memoRef.current = persisted.memo;
     intervalSecondsRef.current = persisted.intervalSeconds;
@@ -335,6 +338,7 @@ export function useMeasurement(): UseMeasurementReturn {
         const sessionId = generateSessionId();
         const filePath = createLogFile(sessionId);
         filePathRef.current = filePath;
+        sessionIdRef.current = sessionId;
         countRef.current = 0;
         memoRef.current = options.memo ?? '';
         intervalSecondsRef.current = options.intervalSeconds;

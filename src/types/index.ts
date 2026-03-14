@@ -28,6 +28,8 @@ export interface MeasurementRecord {
   signal_dbm: number | null;
   /** ユーザーメモ */
   memo: string;
+  /** セッションID */
+  session_id: string;
 }
 
 /** 接続種別 */
@@ -121,6 +123,7 @@ export const CSV_COLUMNS: (keyof MeasurementRecord)[] = [
   'carrier',
   'signal_dbm',
   'memo',
+  'session_id',
 ];
 
 /** CSVヘッダー行 */

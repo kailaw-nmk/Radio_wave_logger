@@ -23,6 +23,7 @@ function createTestRecord(overrides?: Partial<MeasurementRecord>): MeasurementRe
     carrier: 'docomo',
     signal_dbm: -75,
     memo: 'テスト',
+    session_id: 'netlog_20250115_103000',
     ...overrides,
   };
 }
